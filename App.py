@@ -65,7 +65,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "generate_image",
-            "description": "Generate an image. You MUST expand the user's prompt into a highly detailed, photorealistic English description. Add keywords like 'hyper-realistic, 8k resolution, cinematic lighting, photography'. NEVER make objects humanoid. Always add 'no humans, no people'.",
+            "description": "Generate an image. Expand the user's prompt into a detailed English description. If they ask for a fruit/object doing an action, describe it as 'Surreal photography' and make the object giant and prominent so it isn't ignored. Never make objects humanoid. Always add 'no humans, empty background'.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -120,7 +120,7 @@ if user_input := st.chat_input("Type a message..."):
             f"STORED KNOWLEDGE:\n{json.dumps(current_mem, indent=2)}\n\n"
             "INSTRUCTIONS:\n"
             "1. DO NOT use LaTeX or heavy formatting.\n"
-            "2. IMAGE GENERATION RULE: When calling `generate_image`, always rewrite the prompt into a photorealistic, cinematic prompt. NEVER make objects humanoid. If the user asks for a mango riding a horse, write exactly: 'A hyper-realistic, 8k resolution photograph of a literal, ordinary yellow mango fruit resting in the saddle of a real galloping brown horse. Cinematic lighting, National Geographic style photography, highly detailed, no humans, no people'."
+            "2. IMAGE GENERATION RULE: When calling `generate_image`, write a vivid prompt. If the user asks for a weird combination (like a fruit riding a horse), use surrealism. Write exactly something like: 'Surreal photorealistic 8k photograph of a giant, literal ripe yellow mango fruit resting prominently in the saddle of a real brown horse. Highly detailed fruit texture, cinematic lighting, no humans, no people'."
         )
     }
 
@@ -237,4 +237,4 @@ if user_input := st.chat_input("Type a message..."):
 
             except Exception as e:
                 st.error(f"Error: {e}")
-    
+                
