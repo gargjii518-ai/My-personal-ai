@@ -65,11 +65,11 @@ tools = [
         "type": "function",
         "function": {
             "name": "generate_image",
-            "description": "Generate an image. Expand the user's prompt into a detailed English description. If they ask for a fruit/object doing an action, describe it as 'Surreal photography' and make the object giant and prominent so it isn't ignored. Never make objects humanoid. Always add 'no humans, empty background'.",
+            "description": "Generate an image. CRITICAL RULE: If the user asks for a fruit or object doing a human action (like 'riding'), DO NOT use the word 'riding' in the prompt. Image models associate 'riding' with human limbs and will delete the fruit. Instead, describe the object as simply resting or placed on top. Example: 'A gigantic, oversized yellow mango placed squarely on the back of a brown horse, highly detailed photograph.'",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "prompt": {"type": "string", "description": "The detailed English visual prompt."}
+                    "prompt": {"type": "string", "description": "The detailed English visual prompt without human action verbs for objects."}
                 },
                 "required": ["prompt"]
             }
@@ -119,8 +119,8 @@ if user_input := st.chat_input("Type a message..."):
             "You are a personalized AI assistant. Adapt your behavior to the user's stored preferences.\n\n"
             f"STORED KNOWLEDGE:\n{json.dumps(current_mem, indent=2)}\n\n"
             "INSTRUCTIONS:\n"
-            "1. DO NOT use LaTeX or heavy formatting.\n"
-            "2. IMAGE GENERATION RULE: When calling `generate_image`, write a vivid prompt. If the user asks for a weird combination (like a fruit riding a horse), use surrealism. Write exactly something like: 'Surreal photorealistic 8k photograph of a giant, literal ripe yellow mango fruit resting prominently in the saddle of a real brown horse. Highly detailed fruit texture, cinematic lighting, no humans, no people'."
+            "1. DO NOT use LaTeX or heavy formatting. Always respond in English unless the user types in another language.\n"
+            "2. IMAGE GENERATION RULE: When calling `generate_image`, never use action verbs (like 'riding', 'holding', 'driving') for inanimate objects like fruits, as it causes the image model to delete the object. Describe it statically (e.g., 'A massive, giant yellow mango placed on top of a horse's saddle')."
         )
     }
 
