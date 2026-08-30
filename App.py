@@ -1,4 +1,5 @@
-import os
+
+    import os
 import json
 import base64
 import streamlit as st
@@ -6,7 +7,7 @@ from openai import OpenAI
 
 # Page UI
 st.set_page_config(page_title="My AI", page_icon="🤖")
-st.title("🤖 Personal AI Assistant")
+st.title("🤖 Personal AI Assistant (Agent Mode)")
 
 # API Setup
 API_KEY = "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"
@@ -113,20 +114,19 @@ if user_input := st.chat_input("Type a message..."):
     ]
 
     with st.chat_message("assistant"):
-        with st.spinner("Analyzing..."):
+        with st.spinner("Thinking and Self-Correcting..."):
             try:
-                # --- THE FIX IS HERE ---
                 request_params = {
                     "model": active_model,
                     "messages": api_messages
                 }
                 
-                # We only attach the memory tools if there is no image uploaded
+                # Check memory tools
                 if not uploaded_image:
                     request_params["tools"] = tools
                     request_params["tool_choice"] = "auto"
-                # -----------------------
 
+                # Step 1: Initial Draft
                 response = client.chat.completions.create(**request_params)
                 response_message = response.choices[0].message
 
@@ -162,18 +162,45 @@ if user_input := st.chat_input("Type a message..."):
                         if isinstance(m, dict) or hasattr(m, 'role')
                     ]
 
-                    final_res = client.chat.completions.create(
+                    draft_res = client.chat.completions.create(
                         model=active_model,
                         messages=api_messages
                     )
-                    reply = final_res.choices[0].message.content
+                    draft = draft_res.choices[0].message.content
                 else:
-                    reply = response_message.content
+                    draft = response_message.content
 
+                # Step 2: The Reflection Loop
+                max_iterations = 2 
+                iteration = 0
+                
+                while iteration < max_iterations:
+                    st.toast(f"🔄 Self-Correction Pass {iteration + 1}...")
+                    critique_prompt = f"Original Request: {user_input}\nCurrent Draft: {draft}\nEvaluate this draft. Does it perfectly answer the request with zero errors and no LaTeX formatting? If yes, reply EXACTLY with 'PASS'. Otherwise, list the specific errors."
+                    
+                    critique = client.chat.completions.create(
+                        model=TEXT_MODEL, 
+                        messages=[{"role": "user", "content": critique_prompt}]
+                    ).choices[0].message.content
+                    
+                    if "PASS" in critique:
+                        break
+                        
+                    revise_prompt = f"Original Request: {user_input}\nCurrent Draft: {draft}\nCritique: {critique}\nRewrite the draft to perfectly fix the exact issues mentioned in the critique."
+                    
+                    draft = client.chat.completions.create(
+                        model=TEXT_MODEL,
+                        messages=[{"role": "user", "content": revise_prompt}]
+                    ).choices[0].message.content
+                    
+                    iteration += 1
+
+                # Step 3: Final Output
+                reply = draft
                 st.markdown(reply)
                 st.session_state.messages.append({"role": "assistant", "content": reply})
 
             except Exception as e:
                 st.error(f"Error: {e}")
-    
+                
                 
