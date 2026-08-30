@@ -63,21 +63,18 @@ if "messages" not in st.session_state:
 for msg in st.session_state.messages:
     if isinstance(msg, dict) and msg.get("role") in ["user", "assistant"]:
         with st.chat_message(msg["role"]):
-            # If the user message is a list (contains image), just show the text part
             if isinstance(msg["content"], list):
                 st.markdown(msg["content"][0]["text"])
                 st.caption("📷 Image attached")
             else:
                 st.markdown(msg["content"])
 
-# Image Uploader (New Feature!)
+# Image Uploader
 uploaded_image = st.file_uploader("Upload an image (optional)", type=["jpg", "jpeg", "png"])
 
 if user_input := st.chat_input("Type a message..."):
-    # Check if an image was uploaded
     if uploaded_image:
         base64_image = encode_image(uploaded_image)
-        # Format required for vision models
         message_content = [
             {"type": "text", "text": user_input},
             {
@@ -92,7 +89,6 @@ if user_input := st.chat_input("Type a message..."):
         message_content = user_input
         active_model = TEXT_MODEL
 
-    # Save to history and display
     st.session_state.messages.append({"role": "user", "content": message_content})
     with st.chat_message("user"):
         st.markdown(user_input)
@@ -119,15 +115,22 @@ if user_input := st.chat_input("Type a message..."):
     with st.chat_message("assistant"):
         with st.spinner("Analyzing..."):
             try:
-                response = client.chat.completions.create(
-                    model=active_model,
-                    messages=api_messages,
-                    tools=tools if not uploaded_image else None, # Tools sometimes conflict with vision
-                    tool_choice="auto" if not uploaded_image else None
-                )
+                # --- THE FIX IS HERE ---
+                request_params = {
+                    "model": active_model,
+                    "messages": api_messages
+                }
+                
+                # We only attach the memory tools if there is no image uploaded
+                if not uploaded_image:
+                    request_params["tools"] = tools
+                    request_params["tool_choice"] = "auto"
+                # -----------------------
+
+                response = client.chat.completions.create(**request_params)
                 response_message = response.choices[0].message
 
-                if response_message.tool_calls:
+                if hasattr(response_message, 'tool_calls') and getattr(response_message, 'tool_calls', None):
                     for tool_call in response_message.tool_calls:
                         if tool_call.function.name == "update_memory":
                             args = json.loads(tool_call.function.arguments)
@@ -172,4 +175,5 @@ if user_input := st.chat_input("Type a message..."):
 
             except Exception as e:
                 st.error(f"Error: {e}")
+    
                 
