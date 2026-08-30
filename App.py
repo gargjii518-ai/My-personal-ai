@@ -25,7 +25,6 @@ client = OpenAI(
     timeout=120.0
 )
 
-# Text and Vision Models
 TEXT_MODEL = "openai/gpt-oss-120b"
 VISION_MODEL = "qwen/qwen3.6-27b"
 MEMORY_FILE = "user_memory.json"
@@ -46,18 +45,17 @@ def save_memory(data):
     with open(MEMORY_FILE, "w") as f:
         json.dump(data, f)
 
-# We now have TWO tools: Memory and Image Generation!
 tools = [
     {
         "type": "function",
         "function": {
             "name": "update_memory",
-            "description": "Save or update a fact, preference, or conversational habit about the user.",
+            "description": "Save or update a fact, preference, or conversational habit.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "key": {"type": "string", "description": "Category"},
-                    "value": {"type": "string", "description": "Detail to remember"}
+                    "key": {"type": "string"},
+                    "value": {"type": "string"}
                 },
                 "required": ["key", "value"]
             }
@@ -67,11 +65,11 @@ tools = [
         "type": "function",
         "function": {
             "name": "generate_image",
-            "description": "Generate an image based on a prompt. Use this ONLY when the user explicitly asks you to draw, create, or generate a picture/image.",
+            "description": "Generate an image. You MUST expand the user's prompt into a highly detailed, literal English description. If they ask for an object doing a human thing (like an apple riding a horse), explicitly specify it is a literal inanimate object/fruit with cartoon limbs.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "prompt": {"type": "string", "description": "A highly detailed visual description of the image to generate."}
+                    "prompt": {"type": "string", "description": "The detailed English visual prompt."}
                 },
                 "required": ["prompt"]
             }
@@ -79,7 +77,6 @@ tools = [
     }
 ]
 
-# Chat Interface
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -101,9 +98,7 @@ if user_input := st.chat_input("Type a message..."):
             {"type": "text", "text": user_input},
             {
                 "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{base64_image}"
-                }
+                "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
             }
         ]
         active_model = VISION_MODEL
@@ -124,8 +119,7 @@ if user_input := st.chat_input("Type a message..."):
             "You are a personalized AI assistant. Adapt your behavior to the user's stored preferences.\n\n"
             f"STORED KNOWLEDGE:\n{json.dumps(current_mem, indent=2)}\n\n"
             "INSTRUCTIONS:\n"
-            "1. If the user shares personal facts, use the `update_memory` tool.\n"
-            "2. DO NOT use LaTeX or heavy formatting."
+            "1. DO NOT use LaTeX or heavy formatting."
         )
     }
 
@@ -148,11 +142,13 @@ if user_input := st.chat_input("Type a message..."):
 
                 response = client.chat.completions.create(**request_params)
                 response_message = response.choices[0].message
+                
+                # Flag to check if we made an image
+                made_image = False 
 
                 if hasattr(response_message, 'tool_calls') and getattr(response_message, 'tool_calls', None):
                     for tool_call in response_message.tool_calls:
                         
-                        # Handle Memory
                         if tool_call.function.name == "update_memory":
                             args = json.loads(tool_call.function.arguments)
                             key = args.get("key")
@@ -168,14 +164,12 @@ if user_input := st.chat_input("Type a message..."):
                                 "content": "Memory saved."
                             })
 
-                        # Handle Image Generation
                         elif tool_call.function.name == "generate_image":
+                            made_image = True
                             args = json.loads(tool_call.function.arguments)
                             img_prompt = args.get("prompt")
                             
                             st.toast("🎨 Painting your image...")
-                            
-                            # Format URL for the free image API
                             encoded_prompt = urllib.parse.quote(img_prompt)
                             img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
                             
@@ -184,7 +178,7 @@ if user_input := st.chat_input("Type a message..."):
                                 "role": "tool",
                                 "tool_call_id": tool_call.id,
                                 "name": "generate_image",
-                                "content": f"Image generated. YOU MUST reply to the user by pasting this EXACT markdown code so the image displays on their screen: ![{img_prompt}]({img_url})"
+                                "content": f"Image generated. YOU MUST reply to the user by pasting this EXACT markdown code: ![{img_prompt}]({img_url})"
                             })
 
                     updated_system_prompt = {
@@ -208,7 +202,8 @@ if user_input := st.chat_input("Type a message..."):
                 else:
                     draft = response_message.content
 
-                if "Fast" in speed_mode:
+                # Force fast mode if an image was generated so it doesn't waste time checking it
+                if "Fast" in speed_mode or made_image:
                     max_iterations = 0
                 else:
                     max_iterations = 2 
