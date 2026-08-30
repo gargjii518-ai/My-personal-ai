@@ -82,7 +82,7 @@ if user_input := st.chat_input("Type a message..."):
         with st.spinner("Thinking..."):
             try:
                 response = client.chat.completions.create(
-                    model=MODEL_NAME,
+                    model="openai/gpt-oss-120b",
                     messages=api_messages,
                     tools=tools,
                     tool_choice="auto"
@@ -122,7 +122,7 @@ if user_input := st.chat_input("Type a message..."):
                     ]
 
                     final_res = client.chat.completions.create(
-                        model=MODEL_NAME,
+                        model="openai/gpt-oss-120b",
                         messages=api_messages
                     )
                     reply = final_res.choices[0].message.content
