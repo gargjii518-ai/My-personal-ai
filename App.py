@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 import streamlit as st
 from openai import OpenAI
 
@@ -14,8 +15,15 @@ client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
     timeout=120.0
 )
-MODEL_NAME = "llama3-8b-8192"
+
+# Text and Vision Models
+TEXT_MODEL = "openai/gpt-oss-120b"
+VISION_MODEL = "qwen/qwen3.6-27b"
 MEMORY_FILE = "user_memory.json"
+
+# Image Encoding Function
+def encode_image(uploaded_file):
+    return base64.b64encode(uploaded_file.read()).decode('utf-8')
 
 # Memory Functions
 def load_memory():
@@ -39,8 +47,8 @@ tools = [{
         "parameters": {
             "type": "object",
             "properties": {
-                "key": {"type": "string", "description": "Category (e.g., 'name', 'interests', 'tone')"},
-                "value": {"type": "string", "description": "Specific detail to remember"}
+                "key": {"type": "string", "description": "Category"},
+                "value": {"type": "string", "description": "Detail to remember"}
             },
             "required": ["key", "value"]
         }
@@ -51,15 +59,45 @@ tools = [{
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Display previous chat messages
 for msg in st.session_state.messages:
     if isinstance(msg, dict) and msg.get("role") in ["user", "assistant"]:
         with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+            # If the user message is a list (contains image), just show the text part
+            if isinstance(msg["content"], list):
+                st.markdown(msg["content"][0]["text"])
+                st.caption("📷 Image attached")
+            else:
+                st.markdown(msg["content"])
+
+# Image Uploader (New Feature!)
+uploaded_image = st.file_uploader("Upload an image (optional)", type=["jpg", "jpeg", "png"])
 
 if user_input := st.chat_input("Type a message..."):
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    # Check if an image was uploaded
+    if uploaded_image:
+        base64_image = encode_image(uploaded_image)
+        # Format required for vision models
+        message_content = [
+            {"type": "text", "text": user_input},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}"
+                }
+            }
+        ]
+        active_model = VISION_MODEL
+    else:
+        message_content = user_input
+        active_model = TEXT_MODEL
+
+    # Save to history and display
+    st.session_state.messages.append({"role": "user", "content": message_content})
     with st.chat_message("user"):
         st.markdown(user_input)
+        if uploaded_image:
+             st.image(uploaded_image, width=200)
 
     current_mem = load_memory()
     system_prompt = {
@@ -68,8 +106,8 @@ if user_input := st.chat_input("Type a message..."):
             "You are a personalized AI assistant. Adapt your behavior to the user's stored preferences.\n\n"
             f"STORED KNOWLEDGE:\n{json.dumps(current_mem, indent=2)}\n\n"
             "INSTRUCTIONS:\n"
-            "1. If the user shares personal facts, use the `update_memory` tool immediately.\n"
-            "2. DO NOT use LaTeX or heavy formatting. Write math simply (e.g., a^2, x/y)."
+            "1. If the user shares personal facts, use the `update_memory` tool.\n"
+            "2. DO NOT use LaTeX or heavy formatting."
         )
     }
 
@@ -79,13 +117,13 @@ if user_input := st.chat_input("Type a message..."):
     ]
 
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
+        with st.spinner("Analyzing..."):
             try:
                 response = client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
+                    model=active_model,
                     messages=api_messages,
-                    tools=tools,
-                    tool_choice="auto"
+                    tools=tools if not uploaded_image else None, # Tools sometimes conflict with vision
+                    tool_choice="auto" if not uploaded_image else None
                 )
                 response_message = response.choices[0].message
 
@@ -122,7 +160,7 @@ if user_input := st.chat_input("Type a message..."):
                     ]
 
                     final_res = client.chat.completions.create(
-                        model="openai/gpt-oss-120b",
+                        model=active_model,
                         messages=api_messages
                     )
                     reply = final_res.choices[0].message.content
@@ -134,4 +172,4 @@ if user_input := st.chat_input("Type a message..."):
 
             except Exception as e:
                 st.error(f"Error: {e}")
-              
+                
