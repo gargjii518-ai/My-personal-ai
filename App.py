@@ -65,7 +65,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "generate_image",
-            "description": "Generate an image. You MUST expand the user's prompt into a highly detailed, literal English description. If they ask for an object doing a human thing (like an apple riding a horse), explicitly specify it is a literal inanimate object/fruit with cartoon limbs.",
+            "description": "Generate an image. You MUST expand the user's prompt into a highly detailed, literal English description. If they ask for an object doing a human thing, explicitly specify it is a literal inanimate object/fruit with cartoon limbs, and add 'no humans, no people' to the prompt.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -119,7 +119,8 @@ if user_input := st.chat_input("Type a message..."):
             "You are a personalized AI assistant. Adapt your behavior to the user's stored preferences.\n\n"
             f"STORED KNOWLEDGE:\n{json.dumps(current_mem, indent=2)}\n\n"
             "INSTRUCTIONS:\n"
-            "1. DO NOT use LaTeX or heavy formatting."
+            "1. DO NOT use LaTeX or heavy formatting.\n"
+            "2. IMAGE GENERATION RULE: When calling `generate_image`, always rewrite the prompt into a vivid, descriptive prompt that emphasizes the literal subject. If the user asks for an object (like a fruit) doing an action, write something like 'A literal anthropomorphic ripe yellow mango fruit with eyes sitting in a saddle riding a galloping brown horse, cartoon style, no humans, no people'."
         )
     }
 
@@ -143,7 +144,6 @@ if user_input := st.chat_input("Type a message..."):
                 response = client.chat.completions.create(**request_params)
                 response_message = response.choices[0].message
                 
-                # Flag to check if we made an image
                 made_image = False 
 
                 if hasattr(response_message, 'tool_calls') and getattr(response_message, 'tool_calls', None):
@@ -171,7 +171,9 @@ if user_input := st.chat_input("Type a message..."):
                             
                             st.toast("🎨 Painting your image...")
                             encoded_prompt = urllib.parse.quote(img_prompt)
-                            img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+                            
+                            # UPDATED URL: Using the 'flux' model to better understand weird prompts!
+                            img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?model=flux&nologo=true"
                             
                             st.session_state.messages.append(response_message)
                             st.session_state.messages.append({
@@ -202,7 +204,6 @@ if user_input := st.chat_input("Type a message..."):
                 else:
                     draft = response_message.content
 
-                # Force fast mode if an image was generated so it doesn't waste time checking it
                 if "Fast" in speed_mode or made_image:
                     max_iterations = 0
                 else:
@@ -237,4 +238,4 @@ if user_input := st.chat_input("Type a message..."):
 
             except Exception as e:
                 st.error(f"Error: {e}")
-                
+                        
