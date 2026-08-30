@@ -65,7 +65,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "generate_image",
-            "description": "Generate an image. You MUST expand the user's prompt into a highly detailed, literal English description. If they ask for an object doing a human thing, explicitly specify it is a literal inanimate object/fruit with cartoon limbs, and add 'no humans, no people' to the prompt.",
+            "description": "Generate an image. You MUST expand the user's prompt into a highly detailed, photorealistic English description. Add keywords like 'hyper-realistic, 8k resolution, cinematic lighting, photography'. NEVER make objects humanoid. Always add 'no humans, no people'.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -120,7 +120,7 @@ if user_input := st.chat_input("Type a message..."):
             f"STORED KNOWLEDGE:\n{json.dumps(current_mem, indent=2)}\n\n"
             "INSTRUCTIONS:\n"
             "1. DO NOT use LaTeX or heavy formatting.\n"
-            "2. IMAGE GENERATION RULE: When calling `generate_image`, always rewrite the prompt into a vivid, descriptive prompt that emphasizes the literal subject. If the user asks for an object (like a fruit) doing an action, write something like 'A literal anthropomorphic ripe yellow mango fruit with eyes sitting in a saddle riding a galloping brown horse, cartoon style, no humans, no people'."
+            "2. IMAGE GENERATION RULE: When calling `generate_image`, always rewrite the prompt into a photorealistic, cinematic prompt. NEVER make objects humanoid. If the user asks for a mango riding a horse, write exactly: 'A hyper-realistic, 8k resolution photograph of a literal, ordinary yellow mango fruit resting in the saddle of a real galloping brown horse. Cinematic lighting, National Geographic style photography, highly detailed, no humans, no people'."
         )
     }
 
@@ -172,7 +172,6 @@ if user_input := st.chat_input("Type a message..."):
                             st.toast("🎨 Painting your image...")
                             encoded_prompt = urllib.parse.quote(img_prompt)
                             
-                            # UPDATED URL: Using the 'flux' model to better understand weird prompts!
                             img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?model=flux&nologo=true"
                             
                             st.session_state.messages.append(response_message)
@@ -238,4 +237,4 @@ if user_input := st.chat_input("Type a message..."):
 
             except Exception as e:
                 st.error(f"Error: {e}")
-                        
+    
