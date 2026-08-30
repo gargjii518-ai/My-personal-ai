@@ -65,11 +65,11 @@ tools = [
         "type": "function",
         "function": {
             "name": "generate_image",
-            "description": "Generate an image. CRITICAL RULE: If the user asks for a fruit or object doing a human action (like 'riding'), DO NOT use the word 'riding' in the prompt. Image models associate 'riding' with human limbs and will delete the fruit. Instead, describe the object as simply resting or placed on top. Example: 'A gigantic, oversized yellow mango placed squarely on the back of a brown horse, highly detailed photograph.'",
+            "description": "Generate an image. CRITICAL: If the user asks for a fruit or inanimate object, YOU MUST start the prompt with 'A literal, inanimate object'. You MUST add 'ABSOLUTELY ZERO HUMANS, NO PEOPLE, EMPTY SADDLE, NO RIDER'. Example: 'A literal, inanimate yellow mango fruit resting on an empty saddle on a brown horse. ABSOLUTELY ZERO HUMANS, NO PEOPLE.'",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "prompt": {"type": "string", "description": "The detailed English visual prompt without human action verbs for objects."}
+                    "prompt": {"type": "string", "description": "The detailed English visual prompt enforcing zero humans."}
                 },
                 "required": ["prompt"]
             }
@@ -119,8 +119,8 @@ if user_input := st.chat_input("Type a message..."):
             "You are a personalized AI assistant. Adapt your behavior to the user's stored preferences.\n\n"
             f"STORED KNOWLEDGE:\n{json.dumps(current_mem, indent=2)}\n\n"
             "INSTRUCTIONS:\n"
-            "1. DO NOT use LaTeX or heavy formatting. Always respond in English unless the user types in another language.\n"
-            "2. IMAGE GENERATION RULE: When calling `generate_image`, never use action verbs (like 'riding', 'holding', 'driving') for inanimate objects like fruits, as it causes the image model to delete the object. Describe it statically (e.g., 'A massive, giant yellow mango placed on top of a horse's saddle')."
+            "1. DO NOT use LaTeX or heavy formatting. Always respond in English.\n"
+            "2. IMAGE GENERATION RULE: When calling `generate_image` for a fruit or object on an animal, you must violently forbid the image model from creating humans. Include 'NO PEOPLE, NO WOMEN, NO MEN, NO RIDER' in the prompt."
         )
     }
 
@@ -172,7 +172,8 @@ if user_input := st.chat_input("Type a message..."):
                             st.toast("🎨 Painting your image...")
                             encoded_prompt = urllib.parse.quote(img_prompt)
                             
-                            img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?model=flux&nologo=true"
+                            # WE CHANGED THE MODEL TO 'TURBO' HERE
+                            img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?model=turbo&nologo=true"
                             
                             st.session_state.messages.append(response_message)
                             st.session_state.messages.append({
