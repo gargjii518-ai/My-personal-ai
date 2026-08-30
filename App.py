@@ -6,7 +6,15 @@ from openai import OpenAI
 
 # Page UI
 st.set_page_config(page_title="My AI", page_icon="🤖")
-st.title("🤖 Personal AI Assistant (Agent Mode)")
+st.title("🤖 Personal AI Assistant")
+
+# The New Toggle Switch!
+st.write("### ⚙️ AI Thinking Mode")
+speed_mode = st.radio(
+    "Choose how the AI should process your message:",
+    ["⚡ Fast (Normal Chat)", "🧠 Deep Think (Self-Correcting)"],
+    horizontal=True
+)
 
 # API Setup
 API_KEY = "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"
@@ -113,7 +121,7 @@ if user_input := st.chat_input("Type a message..."):
     ]
 
     with st.chat_message("assistant"):
-        with st.spinner("Thinking and Self-Correcting..."):
+        with st.spinner("Processing..."):
             try:
                 request_params = {
                     "model": active_model,
@@ -169,8 +177,12 @@ if user_input := st.chat_input("Type a message..."):
                 else:
                     draft = response_message.content
 
-                # Step 2: The Reflection Loop
-                max_iterations = 2 
+                # Step 2: The Reflection Loop (Controlled by UI Toggle)
+                if "Fast" in speed_mode:
+                    max_iterations = 0
+                else:
+                    max_iterations = 2 
+                    
                 iteration = 0
                 
                 while iteration < max_iterations:
@@ -201,5 +213,4 @@ if user_input := st.chat_input("Type a message..."):
 
             except Exception as e:
                 st.error(f"Error: {e}")
-                
                 
