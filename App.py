@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import urllib.parse
 import streamlit as st
 from openai import OpenAI
 
@@ -8,7 +9,7 @@ from openai import OpenAI
 st.set_page_config(page_title="My AI", page_icon="🤖")
 st.title("🤖 Personal AI Assistant")
 
-# The New Toggle Switch!
+# The Toggle Switch
 st.write("### ⚙️ AI Thinking Mode")
 speed_mode = st.radio(
     "Choose how the AI should process your message:",
@@ -29,11 +30,9 @@ TEXT_MODEL = "openai/gpt-oss-120b"
 VISION_MODEL = "qwen/qwen3.6-27b"
 MEMORY_FILE = "user_memory.json"
 
-# Image Encoding Function
 def encode_image(uploaded_file):
     return base64.b64encode(uploaded_file.read()).decode('utf-8')
 
-# Memory Functions
 def load_memory():
     if os.path.exists(MEMORY_FILE):
         try:
@@ -47,27 +46,43 @@ def save_memory(data):
     with open(MEMORY_FILE, "w") as f:
         json.dump(data, f)
 
-tools = [{
-    "type": "function",
-    "function": {
-        "name": "update_memory",
-        "description": "Save or update a fact, preference, or conversational habit about the user.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "key": {"type": "string", "description": "Category"},
-                "value": {"type": "string", "description": "Detail to remember"}
-            },
-            "required": ["key", "value"]
+# We now have TWO tools: Memory and Image Generation!
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "update_memory",
+            "description": "Save or update a fact, preference, or conversational habit about the user.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string", "description": "Category"},
+                    "value": {"type": "string", "description": "Detail to remember"}
+                },
+                "required": ["key", "value"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_image",
+            "description": "Generate an image based on a prompt. Use this ONLY when the user explicitly asks you to draw, create, or generate a picture/image.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {"type": "string", "description": "A highly detailed visual description of the image to generate."}
+                },
+                "required": ["prompt"]
+            }
         }
     }
-}]
+]
 
 # Chat Interface
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display previous chat messages
 for msg in st.session_state.messages:
     if isinstance(msg, dict) and msg.get("role") in ["user", "assistant"]:
         with st.chat_message(msg["role"]):
@@ -77,7 +92,6 @@ for msg in st.session_state.messages:
             else:
                 st.markdown(msg["content"])
 
-# Image Uploader
 uploaded_image = st.file_uploader("Upload an image (optional)", type=["jpg", "jpeg", "png"])
 
 if user_input := st.chat_input("Type a message..."):
@@ -128,32 +142,49 @@ if user_input := st.chat_input("Type a message..."):
                     "messages": api_messages
                 }
                 
-                # Check memory tools
                 if not uploaded_image:
                     request_params["tools"] = tools
                     request_params["tool_choice"] = "auto"
 
-                # Step 1: Initial Draft
                 response = client.chat.completions.create(**request_params)
                 response_message = response.choices[0].message
 
                 if hasattr(response_message, 'tool_calls') and getattr(response_message, 'tool_calls', None):
                     for tool_call in response_message.tool_calls:
+                        
+                        # Handle Memory
                         if tool_call.function.name == "update_memory":
                             args = json.loads(tool_call.function.arguments)
                             key = args.get("key")
                             value = args.get("value")
-
                             current_mem[key] = value
                             save_memory(current_mem)
                             st.toast(f"🧠 Remembered: {key} -> {value}")
-
                             st.session_state.messages.append(response_message)
                             st.session_state.messages.append({
                                 "role": "tool",
                                 "tool_call_id": tool_call.id,
                                 "name": "update_memory",
                                 "content": "Memory saved."
+                            })
+
+                        # Handle Image Generation
+                        elif tool_call.function.name == "generate_image":
+                            args = json.loads(tool_call.function.arguments)
+                            img_prompt = args.get("prompt")
+                            
+                            st.toast("🎨 Painting your image...")
+                            
+                            # Format URL for the free image API
+                            encoded_prompt = urllib.parse.quote(img_prompt)
+                            img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?nologo=true"
+                            
+                            st.session_state.messages.append(response_message)
+                            st.session_state.messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "name": "generate_image",
+                                "content": f"Image generated. YOU MUST reply to the user by pasting this EXACT markdown code so the image displays on their screen: ![{img_prompt}]({img_url})"
                             })
 
                     updated_system_prompt = {
@@ -177,7 +208,6 @@ if user_input := st.chat_input("Type a message..."):
                 else:
                     draft = response_message.content
 
-                # Step 2: The Reflection Loop (Controlled by UI Toggle)
                 if "Fast" in speed_mode:
                     max_iterations = 0
                 else:
@@ -206,7 +236,6 @@ if user_input := st.chat_input("Type a message..."):
                     
                     iteration += 1
 
-                # Step 3: Final Output
                 reply = draft
                 st.markdown(reply)
                 st.session_state.messages.append({"role": "assistant", "content": reply})
